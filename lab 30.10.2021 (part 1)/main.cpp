@@ -4,111 +4,180 @@
 #include <random>
 
 class SkipList {
-
-
-    struct SkipNote {
+    struct SkipNode {
         double value;
         double key;
-        std::vector<SkipNote*> forwardNotes;
+        std::vector<SkipNode*> forwardNodes;
+        std::vector<SkipNode*> betweenNodes;
 
         explicit
-        SkipNote(double value = 0, double key = 0, std::vector<SkipNote*> forwardNotes = {}) :
-                value(value), key(key), forwardNotes(forwardNotes) { };
+        SkipNode(double value = 0, double key = 0,
+                 std::vector<SkipNode*> forwardNodes = {}, std::vector<SkipNode*> betweenNodes = {}) :
+                 value(value), key(key),
+                 forwardNodes(forwardNodes), betweenNodes(betweenNodes) { };
 
-        //        explicit
-        //        SkipNote(double value = 0, double key = 0, size_t MaxLevel = 1) :
-        //        value(value), key(key) { forwardNotes = std::vector<SkipNote*>(MaxLevel); }
+        SkipNode(const SkipNode& sn) = default;
 
-        SkipNote(const SkipNote& sn) = default;
+        //SkipNode& operator=(const SkipNode& sn) = default;
 
-        SkipNote& operator=(const SkipNote& sn) = default;
-
-        ~SkipNote() = default;
+        ~SkipNode() = default;
     };
 
 private:
-    SkipNote* null;
-    SkipNote* head;
-    size_t listSize;
-    size_t MaxLevel = 4;
+    SkipNode* null;
+    SkipNode* head;
+    int listSize;
+    int MaxLevel = 4;
     const double probability = 0.61803398875; //based on golden ratio
 
-public:
-    SkipList() {
-        double tmp_value, tmp_key;
-        std::vector<SkipNote*> tmp_forwardNotes;
+    bool comp(double left, double right) {return (left < right);}
 
-        tmp_value = tmp_key = std::numeric_limits<double>::max();
-        for (size_t i = 0; i < MaxLevel; i++) { tmp_forwardNotes.push_back(nullptr); }
-        SkipNote *p_null = new SkipNote(tmp_value, tmp_key, tmp_forwardNotes);
-        null = p_null;
-
-        tmp_value = tmp_key = std::numeric_limits<double>::min();
-        tmp_forwardNotes.clear();
-        for (size_t i = 0; i < MaxLevel; i++) { tmp_forwardNotes.push_back(null); }
-        SkipNote *p_head = new SkipNote(tmp_value, tmp_key, tmp_forwardNotes);
-        head = p_head;
-
-        listSize = 0;
-    };
-
-    SkipList(const SkipList& sl) :
-    null(sl.null), head(sl.head), listSize(sl.listSize), MaxLevel(sl.MaxLevel) {
-        SkipNote *tmp_sn = head;
-        while (tmp_sn->forwardNotes[0] != nullptr) {
-            SkipNote *sn = new SkipNote(*tmp_sn->forwardNotes[0]);
-            tmp_sn->forwardNotes[0] = sn;
-            tmp_sn = sn;
-        }
-//        for (size_t i = 0; i < MaxLevel; i++) {
-//
-//        }
+    int randomLevel() const {
+        std::random_device rd;
+        std::mt19937 gen(rd());
+        std::uniform_real_distribution<> p(0, 1);
+        int level = 1;
+        while (probability >= p(gen) && level < MaxLevel) {level++;}
+        return level;
     }
 
-    void insert(double value, double key) {
-        SkipNote* tmp_sn = head;
-        std::vector<SkipNote*> tmp_betweenNotes(MaxLevel);
-        std::vector<SkipNote*> tmp_forwardNotes(MaxLevel);
-        for (size_t i = 1; i <= MaxLevel; i++) {
-            while (tmp_sn->forwardNotes[MaxLevel - i]->key < key) {
-                tmp_sn = tmp_sn->forwardNotes[MaxLevel - i];
-            }
-            tmp_betweenNotes[MaxLevel - i] = tmp_sn;
-            tmp_forwardNotes[MaxLevel - i] = tmp_sn->forwardNotes[0];
+public:
+    //constructor
+    SkipList() {
+        double tmp_value, tmp_key;
+        std::vector<SkipNode*> tmp_forwardNodes, tmp_betweenNodes;
+
+        tmp_value = tmp_key = std::numeric_limits<double>::max();
+        for (int i = 0; i < MaxLevel; i++) {
+            tmp_forwardNodes.push_back(nullptr);
+            tmp_betweenNodes.push_back(head);
         }
-        std::mt19937 gen(0);
-        std::uniform_real_distribution<> p(0, 1);
+        SkipNode *p_null = new SkipNode(tmp_value, tmp_key, tmp_forwardNodes, tmp_betweenNodes);
+        null = p_null;
 
+        tmp_forwardNodes.clear();
+        tmp_betweenNodes.clear();
 
-
-
-        size_t tmp_level = 1;
-//      SkipNote* sn = new SkipNote(value, key);
-        for (size_t i = 0; i < MaxLevel; i++) {
-            if (probability < p(gen)) {
-                tmp_level++;
-            }
-            else {
-                break;
-            }
+        tmp_value = tmp_key = std::numeric_limits<double>::min();
+        for (int i = 0; i < MaxLevel; i++) {
+            tmp_forwardNodes.push_back(null);
+            tmp_betweenNodes.push_back(nullptr);
         }
-        std::vector<SkipNote*> tmp_list(tmp_level);
-        SkipNote* sn = new SkipNote(value, key, tmp_list);
-        for (size_t i = 0; i < tmp_level; i++) {
-            tmp_list[i] = tmp_forwardNotes[i];
-            *tmp_betweenNotes[i] = *sn;
+        SkipNode *p_head = new SkipNode(tmp_value, tmp_key, tmp_forwardNodes, tmp_betweenNodes);
+        head = p_head;
+
+        for (int i = 0; i < MaxLevel; i++) { null->betweenNodes[i] = head; }
+
+        listSize = 0;
+    }
+
+    //copy_constructor
+    SkipList(const SkipList &sl) : head(head), null(null), listSize(sl.listSize), MaxLevel(sl.MaxLevel) {
+        std::vector<SkipNode*> tmp_vect(MaxLevel);
+        head = new SkipNode(sl.head->value, sl.head->key, tmp_vect, tmp_vect);
+        null = new SkipNode(sl.null->value, sl.null->key, tmp_vect, tmp_vect);
+
+        for (int i = 0; i < MaxLevel; i++) {
+            head->forwardNodes[i] = null;
+            head->betweenNodes[i] = nullptr;
+            null->forwardNodes[i] = nullptr;
+            null->betweenNodes[i] = head;
+        }
+
+        SkipNode *tmp_ptr = sl.head->forwardNodes[0];
+        while (tmp_ptr != sl.null) {
+            this->insert(tmp_ptr->value, tmp_ptr->key, tmp_ptr->forwardNodes.size());
+            tmp_ptr = tmp_ptr->forwardNodes[0];
+        }
+    }
+
+    void insert(double value, double key, int level = 0) {
+        SkipNode *tmp_ptr = head;
+
+        if (level == 0) {level = randomLevel();}
+        std::vector<SkipNode*> tmp_Nodes(level);
+        SkipNode *ptr_sn = new SkipNode(value, key, tmp_Nodes, tmp_Nodes);
+        for (int i = MaxLevel - 1; i >= 0; i--) {
+            while (comp(tmp_ptr->forwardNodes[i]->key, key)) {
+                tmp_ptr = tmp_ptr->forwardNodes[i];
+            }
+            if (i < level) {
+                ptr_sn->forwardNodes[i] = tmp_ptr->forwardNodes[i];
+                ptr_sn->betweenNodes[i] = tmp_ptr;
+                tmp_ptr->forwardNodes[i]->betweenNodes[i] = ptr_sn;
+                tmp_ptr->forwardNodes[i] = ptr_sn;
+            }
         }
         listSize++;
     }
 
+    //destructor
+    ~SkipList() {
+        this->clear();
+        head->~SkipNode();
+        null->~SkipNode();
+    }
+
+    bool search(double key) {
+        SkipNode *tmp_ptr = head;
+
+        for (int i = MaxLevel - 1; i >= 0; i--) {
+            while (comp(tmp_ptr->forwardNodes[i]->key, key)) {
+                tmp_ptr = tmp_ptr->forwardNodes[i];
+            }
+        }
+        if (tmp_ptr->forwardNodes[0]->key == key) {return true;}
+        else {return false;}
+    }
+
+    int count(double key) {
+        SkipNode *tmp_ptr = head;
+
+        for (int i = MaxLevel - 1; i >= 0; i--) {
+            while (tmp_ptr->forwardNodes[i]->key < key) {
+                tmp_ptr = tmp_ptr->forwardNodes[i];
+            }
+        }
+        int count = 0;
+
+        while (tmp_ptr->forwardNodes[0]->key == key) {
+            tmp_ptr = tmp_ptr->forwardNodes[0];
+            count++;
+        }
+        return count;
+    }
+
     bool empty() const { return (listSize == 0); }
 
-    size_t size() const { return listSize; }
+    int size() const { return listSize; }
+
+    void clear() {
+        if (!this->empty()) {
+            SkipNode *tmp_ptr = head;
+            SkipNode *check_ptr = head->forwardNodes[0];
+
+            while (check_ptr != null) {
+                tmp_ptr = check_ptr;
+                check_ptr = check_ptr->forwardNodes[0];
+                tmp_ptr->~SkipNode();
+            }
+
+            for (int i = 0; i < MaxLevel; i++) {
+                head->forwardNodes[i] = null;
+                null->betweenNodes[i] = head;
+            }
+            listSize = 0;
+        }
+    }
 
     friend std::ostream& operator<<(std::ostream& out, const SkipList& sl) {
-        SkipNote* tmp_sn = sl.head;
-        for (size_t i = 0; i < sl.listSize; i++) {
-            out << tmp_sn->value << " ";
+        SkipNode* tmp_ptr;
+        tmp_ptr = sl.head->forwardNodes[0];
+        while (tmp_ptr != sl.null) {
+            out << tmp_ptr->value << " ";
+            out << tmp_ptr->betweenNodes[0]->value << " " << tmp_ptr->forwardNodes[0]->value << " ";
+            out << tmp_ptr->forwardNodes.size() << std::endl;
+            tmp_ptr = tmp_ptr->forwardNodes[0];
         }
         return out;
     }
@@ -116,21 +185,19 @@ public:
 
 int main() {
     SkipList sl;
-    std::cout << sl << std::endl;
-    sl.insert(1, 1);
+    for (int i = 0; i < 4; i++) {
+        sl.insert(1, 1);
+        sl.insert(0, 0);
+        sl.insert(4, 4);
+        sl.insert(10, 10);
+    } //generation of sl
     SkipList slsl(sl);
-    //sl.insert(3, 3);
-    //sl.insert(2, 2);
-    std::cout << sl.size() << std::endl;
-    std::cout << sl << std::endl;
-    std::cout << slsl << std::endl;
-    //    std::cout << std::numeric_limits<double>::max() << std::endl;
-    //    std::mt19937 gen(0);
-    //    std::uniform_real_distribution<> p(0, 1);
-    //    std::cout << p(gen) << std::endl;
-    //    std::cout << p(gen) << std::endl;
-    //    std::vector<int> a(5);
-    //    std::vector<int> b(a.begin(), a.begin() + 2);
-    //    std::cout << a.size() << " " << b.size() << std::endl;
+    SkipList slslsl(slsl);
+    std::cout << slsl.count(10) << std::endl;
+    std::cout << sl;
+    std::cout << slslsl;
+    slslsl.clear();
+    std::cout << sl;
+    std::cout << slslsl;
     return 0;
 }
