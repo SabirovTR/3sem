@@ -18,7 +18,7 @@ class SkipList {
 
         SkipNode(const SkipNode& sn) = default;
 
-        //SkipNode& operator=(const SkipNode& sn) = default;
+        SkipNode& operator=(const SkipNode& sn) = default;
 
         ~SkipNode() = default;
     };
@@ -30,7 +30,7 @@ private:
     int MaxLevel = 4;
     const double probability = 0.61803398875; //based on golden ratio
 
-    bool comp(double left, double right) {return (left < right);}
+    static bool comp(double left, double right) {return (left < right);} //?
 
     int randomLevel() const {
         std::random_device rd;
@@ -89,6 +89,16 @@ public:
             this->insert(tmp_ptr->value, tmp_ptr->key, tmp_ptr->forwardNodes.size());
             tmp_ptr = tmp_ptr->forwardNodes[0];
         }
+    }
+
+    //move_constructor
+    SkipList(SkipList &&sl) : head(sl.head), null(sl.null), listSize(sl.listSize), MaxLevel(sl.MaxLevel) {
+        sl.head = nullptr;
+        sl.null = nullptr;
+        sl.listSize = 0;
+        sl.MaxLevel = 0;
+
+        for (int i = 0; i < MaxLevel; i++) {null->betweenNodes[i]->forwardNodes[i] = null;}
     }
 
     void insert(double value, double key, int level = 0) {
@@ -170,6 +180,34 @@ public:
         }
     }
 
+    //copy_assignment_operator
+    SkipList& operator=(const SkipList &sl) {
+        if (&sl == this) {return *this;}
+
+        SkipList *tmp_sl = new SkipList(sl);
+        head = tmp_sl->head;
+        null = tmp_sl->null;
+        listSize = tmp_sl->listSize;
+        MaxLevel = tmp_sl->MaxLevel;
+        return *this;
+    }
+
+    //move_assignment_operator
+    SkipList& operator=(SkipList &&sl) {
+        if (&sl == this) {return *this;}
+
+        head = sl.head;
+        null = sl.null;
+        for(int i = 0; i < MaxLevel; i++) {null->betweenNodes[i]->forwardNodes[i] = null;}
+
+        sl.clear();
+        sl.head->~SkipNode();
+        sl.null->~SkipNode();
+        sl.listSize = 0;
+        sl.MaxLevel = 0;
+    }
+
+
     friend std::ostream& operator<<(std::ostream& out, const SkipList& sl) {
         SkipNode* tmp_ptr;
         tmp_ptr = sl.head->forwardNodes[0];
@@ -191,13 +229,14 @@ int main() {
         sl.insert(4, 4);
         sl.insert(10, 10);
     } //generation of sl
-    SkipList slsl(sl);
-    SkipList slslsl(slsl);
-    std::cout << slsl.count(10) << std::endl;
-    std::cout << sl;
-    std::cout << slslsl;
+    //SkipList slsl(sl);
+    //SkipList slslsl(slsl);
+    //std::cout << slsl.count(10) << std::endl;
+    //std::cout << sl;
+    SkipList slslsl = sl;
+    //std::cout << slslsl;
     slslsl.clear();
     std::cout << sl;
-    std::cout << slslsl;
+    //std::cout << slslsl;
     return 0;
 }
