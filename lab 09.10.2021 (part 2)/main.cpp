@@ -1,121 +1,180 @@
 #include <iostream>
 
-
 template <typename T>
 class Grid {
 private:
-    size_t *size = nullptr;
-    T **memory = nullptr;
-    size_t x_size = 0, y_size = 0;
-
+    int x_size;
+    int y_size;
+    Grid* subGrids;
+    T value;
 public:
-    Grid<T>(size_t x_size, size_t y_size) : x_size(x_size), y_size(y_size) {
-        memory = new T * [x_size*y_size];
-        size = new size_t [x_size*y_size];
-        for (int i = 0; i < x_size*y_size; i++) {
-            memory[i] = new T;
-            size[i] = 1;
-        }
+    explicit
+    Grid(T value = 0) : value(value) {
+        x_size = 1;
+        y_size = 1;
+        subGrids = nullptr;
     }
 
-    T operator()(size_t x_idx, size_t y_idx) const {
-        float sum = 0;
-        for (int i = 0; i < size[x_idx*(y_size) + y_idx]; i++) {
-            sum += memory[x_idx*(y_size) + y_idx][i];
-        }
-        return sum/size[x_idx*(y_size) + y_idx];
-    }
-
-    T & operator()(size_t x_idx, size_t y_idx) {
-        return *memory[x_idx*(y_size) + y_idx];
-    };
-
-    size_t get_xsize() const {
-        return x_size;
-    }
-
-    size_t get_ysize() const {
-        return y_size;
-    }
-
-    Grid& operator=(T x) {
-        for (size_t i = 0; i < x_size*y_size; i++) {
-            for (size_t j = 0; j < size[i]; j++) {
-                memory[i][j] = x;
+    Grid(Grid& g) : x_size(g.x_size), y_size(g.y_size), value(g.value) {
+        subGrids = new Grid[x_size*y_size];
+        if (g.subGrids != nullptr) {
+            for (int i = 0; i < x_size * y_size; i++) {
+                if (g.subGrids[i].subGrids != nullptr) {
+                    Grid tmp(g.subGrids[i]);
+                    subGrids[i] = tmp;
+                } else {
+                    this->insert(i, g.subGrids[i].value);
+                }
             }
+        } else {this->insert(0, g.subGrids[0].value);}
+    }
+
+    T operator()(int x_idx, int y_idx) const {
+        return subGrids[x_idx*x_size + y_idx].value;
+    }
+
+    int get_xsize() const {return x_size;}
+    int get_ysize() const {return y_size;}
+
+    void insert(int x_idx, int y_idx, T value_in) {
+        subGrids[x_idx*y_size + y_idx].x_size = 1;
+        subGrids[x_idx*y_size + y_idx].y_size = 1;
+        subGrids[x_idx*y_size + y_idx].value = value_in;
+        subGrids[x_idx*y_size + y_idx].subGrids = nullptr;
+
+        T mid = 0;
+        for (int j = 0; j < x_size*y_size; j++) {
+            mid += subGrids[j].value/(x_size*y_size);
+        }
+        value = mid;
+    }
+
+    void insert(int i, T value_in) {
+        subGrids[i].x_size = 1;
+        subGrids[i].y_size = 1;
+        subGrids[i].value = value_in;
+        subGrids[i].subGrids = nullptr;
+
+        T mid = 0;
+        for (int j = 0; j < x_size*y_size; j++) {
+            mid += subGrids[j].value/(x_size*y_size);
+        }
+        value = mid;
+    }
+
+    void insert(int x_idx, int y_idx, const Grid& g) {
+        subGrids[x_idx*y_size + y_idx].x_size = g.x_size;
+        subGrids[x_idx*y_size + y_idx].y_size = g.y_size;
+        subGrids[x_idx*y_size + y_idx].value = g.value;
+        subGrids[x_idx*y_size + y_idx].subGrids = g.subGrids;
+
+        T mid = 0;
+        for (int j = 0; j < x_size*y_size; j++) {
+            mid += subGrids[j].value/(x_size*y_size);
+        }
+        value = mid;
+    }
+
+    void insert(int i, const Grid& g) {
+        subGrids[i].x_size = g.x_size;
+        subGrids[i].y_size = g.y_size;
+        subGrids[i].value = g.value;
+        subGrids[i].subGrids = g.subGrids;
+
+        T mid = 0;
+        for (int j = 0; j < x_size*y_size; j++) {
+            mid += subGrids[j].value/(x_size*y_size);
+        }
+        value = mid;
+    }
+
+    Grid(int x_size, int y_size, T value) : x_size(x_size), y_size(y_size), value(value) {
+        subGrids = new Grid[x_size*y_size];
+        for (int i = 0; i < x_size*y_size; i++) {
+            this->insert(i, value);
+        }
+    }
+
+    Grid& operator=(T value_in) {
+        value = value_in;
+        for (int i = 0; i < x_size*y_size; i++) {
+            subGrids[i].value = value_in;
         }
         return *this;
     }
 
-    Grid& make_subgrid(size_t x_idx, size_t y_idx,
-                       size_t x_sub_size, size_t y_sub_size) {
-        delete [] memory[x_idx*(y_size) + y_idx];
-        memory[x_idx*(y_size) + y_idx] = new T [x_sub_size*y_sub_size];
-        size[x_idx*(y_size) + y_idx] = x_sub_size*y_sub_size;
-        return *this;
-    };
-
-    Grid& collapse_subgrid(size_t x_idx, size_t y_idx,
-                           size_t x_sub_size, size_t y_sub_size) {
-        T sum = 0;
-        for (size_t i = 0; i < x_sub_size*y_sub_size; i++) {
-            sum += memory[x_idx*(y_size) + y_idx][i];
-        }
-        delete [] memory[x_idx*(y_size) + y_idx];
-        memory[x_idx*(y_size) + y_idx] = new T(sum/(x_sub_size*y_sub_size));
-        size[x_idx*(y_size) + y_idx] = 1;
+    Grid& collapse_subgrid(int x_idx, int y_idx) {
+        subGrids[x_idx*y_size + y_idx] = Grid(subGrids[x_idx*y_size + y_idx].value);
         return *this;
     }
 
     Grid& get_subgrid(size_t x_idx, size_t y_idx) {
-        return this[x_idx*(y_size) + y_idx];
-    }
-
-    bool is_subgrid(size_t x_idx, size_t y_idx) const {
-        return size[x_idx*(y_size) + y_idx] - 1;
-    }
-
-    friend std::ostream& operator<<(std::ostream& out, Grid const& g) {
-        for (size_t i = 0; i < g.x_size; i++) {
-            for (size_t j = 0; j < g.y_size; j++) {
-                out.width(5);
-                out << g(i, j);
-            }
-            out << std::endl;
+        if (this->is_subrid(x_idx, y_idx)) {
+            return subGrids[x_idx*y_size + y_idx];
+        } else {
+            std::cout << "Error" << std::endl;
         }
+    }
+
+    bool is_subrid(size_t x_idx, size_t y_idx) const {
+        if (subGrids[x_idx*y_size + y_idx].subGrids != nullptr) {
+            return true;
+        } else {return false;}
+    }
+
+    friend std::ostream& operator<<(std::ostream& out, const Grid& g) {
+        if (g.x_size*g.y_size != 1) {
+            for (int i = 0; i < g.x_size; i++) {
+                for (int j = 0; j < g.y_size; j++) {
+                    out << g.subGrids[i*g.y_size + j].value << " "
+                        << g.subGrids[i*g.y_size + j].x_size*g.subGrids[i*g.y_size + j].y_size << " ";
+                        //Выводим размер подсетки, чтобы видеть наличие подсеток
+                }
+                out << std::endl;
+            }
+        } else {out << g.value << " ";}
+        out << std::endl;
         return out;
     }
 
-    friend std::istream& operator>>(std::istream& in, Grid & g) {
+    friend std::istream& operator>>(std::istream& in, Grid& g) {
         for (size_t i = 0; i < g.x_size; i++) {
             for (size_t j = 0; j < g.y_size; j++) {
-                in >> *g.memory[i*(g.y_size) + j];
+                in >> g.subGrids[i*(g.y_size) + j].value;
             }
         }
         return in;
     }
 
     ~Grid() {
-        delete [] memory;
+        if (subGrids != nullptr) {
+            for (int i = 0; i < x_size*y_size; i++) {
+                this->subGrids[i].~Grid();
+            }
+        } else {delete [] subGrids;}
     }
 };
 
+
 int main() {
-    Grid<float> g = Grid<float>(2, 3);
-    g = 5;
-    std::cout << g(0, 0) << std::endl;
-    std::cout << "x_size:" << g.get_xsize() << std::endl;
-    std::cout << "y_size:" << g.get_ysize() << std::endl;
+    Grid<double> g(4, 2, 11);
     std::cout << g;
-    std::cin >> g;
+    Grid<double> gg = g;
+    std::cout << gg;
+    g.insert(4, gg);
+    g.insert(6, gg);
     std::cout << g;
-    g.make_subgrid(1, 1, 2, 2);
-    std::cout << &g.get_subgrid(1, 1) << std::endl;
-    g.collapse_subgrid(1, 1, 2, 2);
+    Grid<double> ggg(g);
+    std::cout << ggg;
+    g.insert(3, ggg);
     std::cout << g;
-    g.make_subgrid(1, 1, 20, 20);
-    std::cout << g;
-    std::cout << g.is_subgrid(1, 1) << std::endl;
-    std::cout << g.is_subgrid(0, 0) << std::endl;
+
+    std::cout << "testing is_subgrid" << std::endl;
+    gg.~Grid();
+    gg = 5;
+    std::cout << gg;
+    g.insert(1, 1, gg);
+    std::cout << gg.is_subrid(1, 1) << std::endl;
+    std::cout << g.is_subrid(1, 1) << std::endl;
     return 0;
 }
